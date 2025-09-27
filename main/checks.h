@@ -2,6 +2,6 @@
 #define CHECKS_H
 
 void checkValue(Flowmeter* fm);
-void checkSerial();
+void checkSerial(); // Mengembalikan true jika ada perintah yang diproses
 
 #endif

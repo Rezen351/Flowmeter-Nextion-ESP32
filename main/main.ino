@@ -13,62 +13,28 @@ Flowmeter flowmeter1;
 // Buat objek ModbusMaster
 ModbusMaster node;
 
-// Untuk Arduino Mega, kita gunakan objek Serial2 yang sudah ada.
-// Serial1: Pins 19 (RX), 18 (TX)
-// Serial2: Pins 17 (RX), 16 (TX)
-// Serial3: Pins 15 (RX), 14 (TX)
+// =================================================================
+// == TASK & CORE DEFINITIONS                                     ==
+// =================================================================
+TaskHandle_t DisplayTask;
 
-// Untuk ESP-32
-// HardwareSerial ModbusSerial(2);
-unsigned long previousMillis = 0;
-const long interval = 1000; // Interval diperlambat jadi 1 detik untuk pembacaan debug
+// =================================================================
+// == TIMING & STATE VARIABLES                                    ==
+// =================================================================
+unsigned long previousSensorMillis = 0;
+const long sensorInterval = 250; // Interval pembacaan sensor (ms)
+static bool readSensor0Next = true; // Flag untuk pembacaan sensor bergantian
 
+// =================================================================
+// == DISPLAY UPDATE FUNCTIONS (RUN ON CORE 0)                    ==
+// =================================================================
 
-void setup() {
-  // put your setup code here, to run once:
-  initial();
-  
-  // Inisialisasi Serial untuk Monitor/Debug
-  Serial.begin(MONITOR_BAUD_RATE);
-
-  // Inisialisasi Serial1 untuk HMI Nextion Display
-  Serial1.begin(HMI_BAUD_RATE);
-
-  // Inisialisasi Serial2 untuk Modbus Master
-  Serial2.begin(MODBUS_BAUD_RATE);
-
-  //ModbusSerial.begin(MODBUS_BAUD_RATE, SERIAL_8N1, MODBUS_RX_PIN,MODBUS_TX_PIN);
-  
-  // Hubungkan objek node ke port serial Modbus
-  node.begin(MODBUS_SLAVE_ID, Serial2);
-}
-
-void loop() {
-  // put your main code here, to run repeatedly:
-  checkSerial();
-  
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    
-    // Panggil fungsi update flowmeter seperti biasa
-    // flowmeter0Update(); 
-    // flowmeter1Update();
-
-    // Panggil fungsi debug baru
-    // debugModbusRegisters();
-    Serial.println(readModbusSensor());
-  
-  }
-}
-
-void flowmeter0Update(){
+void updateDisplay0(){
   if (flowmeter0.state == 1) {
-    checkValue(&flowmeter0);
     // Update primary value display
-    char buffer[10]; // Increased buffer size for float
-    dtostrf(flowmeter0.primaryValue, 4, 2, buffer); // 4 total width, 2 decimal places
-    Serial1.print("pv0.txt=\"");
+    char buffer[10];
+    dtostrf(flowmeter0.primaryValue, 4, 2, buffer);
+    Serial1.print("pv0.txt=\""); 
     Serial1.print(buffer);
     Serial1.print("\"");
     Serial1.write(0xFF);
@@ -79,20 +45,17 @@ void flowmeter0Update(){
     int gaugeValue = (flowmeter0.currentMilliampere - 4.0) * 6.25;
     Serial1.print("j0.val=");
     Serial1.print(gaugeValue);
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
+    Serial1.write(0xFF);;
     Serial1.write(0xFF);
   }
 }
 
-void flowmeter1Update(){
+void updateDisplay1(){
   if (flowmeter1.state == 1) {
-    checkValue(&flowmeter1);
-
     // Update primary value display for flowmeter1
-    char buffer[10]; // Increased buffer size for float
-    dtostrf(flowmeter1.primaryValue, 4, 2, buffer); // 4 total width, 2 decimal places
-    Serial1.print("pv1.txt=\""); // Assuming pv1.txt for flowmeter1
+    char buffer[10];
+    dtostrf(flowmeter1.primaryValue, 4, 2, buffer);
+    Serial1.print("pv1.txt=\"");
     Serial1.print(buffer);
     Serial1.print("\"");
     Serial1.write(0xFF);
@@ -107,4 +70,70 @@ void flowmeter1Update(){
     Serial1.write(0xFF);
     Serial1.write(0xFF);
   }
+}
+
+// Task untuk Core 0: Hanya mengurus update display
+void DisplayTaskCode(void * pvParameters) {
+  Serial.print("Display task running on core ");
+  Serial.println(xPortGetCoreID());
+
+  for (;;) {
+    updateDisplay0();
+    delay(250);
+    updateDisplay1();
+    vTaskDelay(500 / portTICK_PERIOD_MS); // Update display setiap 250ms
+  }
+}
+
+// =================================================================
+// == SENSOR & LOGIC FUNCTIONS (RUN ON CORE 1)                    ==
+// =================================================================
+
+void updateSensorValues() {
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousSensorMillis >= sensorInterval) {
+    previousSensorMillis = currentMillis;
+
+    // Baca sensor secara bergantian
+    if (readSensor0Next) {
+      checkValue(&flowmeter0);
+    } else {
+      checkValue(&flowmeter1);
+    }
+    readSensor0Next = !readSensor0Next; // Ganti sensor untuk pembacaan berikutnya
+
+    // Cetak nilai yang telah diupdate untuk debug
+    Serial.print("Sensor 0 (mA): ");
+    Serial.println(flowmeter0.currentMilliampere);
+    Serial.print("Sensor 1 (mA): ");
+    Serial.println(flowmeter1.currentMilliampere);
+  }
+}
+
+// =================================================================
+// == SETUP & LOOP (MAIN CORE - CORE 1)                           ==
+// =================================================================
+
+void setup() {
+  initial();
+  Serial.begin(MONITOR_BAUD_RATE);
+  Serial1.begin(HMI_BAUD_RATE, SERIAL_8N1, 16, 17);
+  Serial2.begin(MODBUS_BAUD_RATE, SERIAL_8N1, 25, 26);
+  node.begin(MODBUS_SLAVE_ID, Serial2);
+
+  // Buat task untuk display di Core 0
+  xTaskCreatePinnedToCore(
+      DisplayTaskCode,   /* Function to implement the task */
+      "DisplayTask",     /* Name of the task */
+      10000,             /* Stack size in words */
+      NULL,              /* Task input parameter */
+      1,                 /* Priority of the task */
+      &DisplayTask,      /* Task handle. */
+      0);                /* Core where the task should run */
+}
+
+void loop() {
+  // Core 1 akan menjalankan ini
+  checkSerial(); // Tetap periksa input dari HMI
+  updateSensorValues(); // Update nilai sensor dari Modbus
 }

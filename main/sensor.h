@@ -4,4 +4,5 @@
 float readMilliampereSensor0();
 float readMilliampereSensor1();
 float readModbusSensor();
+void debugModbusRegisters();
 #endif
