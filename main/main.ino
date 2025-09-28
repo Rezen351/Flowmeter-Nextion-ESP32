@@ -34,19 +34,14 @@ void updateDisplay0(){
     // Update primary value display
     char buffer[10];
     dtostrf(flowmeter0.primaryValue, 4, 2, buffer);
-    Serial1.print("pv0.txt=\""); 
-    Serial1.print(buffer);
-    Serial1.print("\"");
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
+    sendNextionCommand("pv0.txt=\"" + String(buffer) + "\"");
 
     // Update gauge j0
     int gaugeValue = (flowmeter0.currentMilliampere - 4.0) * 6.25;
-    Serial1.print("j0.val=");
-    Serial1.print(gaugeValue);
-    Serial1.write(0xFF);;
-    Serial1.write(0xFF);
+    if (gaugeValue < 0) {
+      gaugeValue = 0;
+    } // Clamp gauge value to be non-negative
+    sendNextionCommand("j0.val=" + String(gaugeValue));
   }
 }
 
@@ -55,20 +50,14 @@ void updateDisplay1(){
     // Update primary value display for flowmeter1
     char buffer[10];
     dtostrf(flowmeter1.primaryValue, 4, 2, buffer);
-    Serial1.print("pv1.txt=\"");
-    Serial1.print(buffer);
-    Serial1.print("\"");
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
+    sendNextionCommand("pv1.txt=\"" + String(buffer) + "\"");
 
     // Update gauge j1
     int gaugeValue = (flowmeter1.currentMilliampere - 4.0) * 6.25;
-    Serial1.print("j1.val=");
-    Serial1.print(gaugeValue);
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
+    if (gaugeValue < 0) {
+      gaugeValue = 0;
+    } // Clamp gauge value to be non-negative
+    sendNextionCommand("j1.val=" + String(gaugeValue));
   }
 }
 
@@ -79,7 +68,7 @@ void DisplayTaskCode(void * pvParameters) {
 
   for (;;) {
     updateDisplay0();
-    delay(250);
+    delay(10);
     updateDisplay1();
     vTaskDelay(500 / portTICK_PERIOD_MS); // Update display setiap 250ms
   }
@@ -133,7 +122,6 @@ void setup() {
 }
 
 void loop() {
-  // Core 1 akan menjalankan ini
-  checkSerial(); // Tetap periksa input dari HMI
-  updateSensorValues(); // Update nilai sensor dari Modbus
+  checkSerial(); 
+  updateSensorValues(); 
 }

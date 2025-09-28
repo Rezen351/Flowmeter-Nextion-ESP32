@@ -1,4 +1,5 @@
 #include "flowmeter.h"
+#include "init.h"
 
 void starting() {
   // starting check: ensure all systems are normal
@@ -11,13 +12,7 @@ void starting() {
 
   // Check primmaryButton values and send to Nextion
   for (int i = 0; i < 4; i++) {
-    Serial1.print("pb");
-    Serial1.print(i + 1);
-    Serial1.print(".val=");
-    Serial1.print(flowmeter0.primmaryButton[i]);
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
+    sendNextionCommand("pb" + String(i + 1) + ".val=" + String(flowmeter0.primmaryButton[i]));
     delay(500);
   }
   // cycle through function buttons 0-4
@@ -25,13 +20,7 @@ void starting() {
     flowmeter0.functionButton[i] = 1;
   }
   for (int i = 0; i < 5; i++) {
-    Serial1.print("fb");
-    Serial1.print(i + 1);
-    Serial1.print(".val=");
-    Serial1.print(flowmeter0.functionButton[i]);
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
+    sendNextionCommand("fb" + String(i + 1) + ".val=" + String(flowmeter0.functionButton[i]));
     delay(500);
   }
 
@@ -42,12 +31,7 @@ void starting() {
     flowmeter0.primaryValue = i;
     char buffer[10]; // Increased buffer size for float
     dtostrf(flowmeter0.primaryValue, 4, 0, buffer); // 4 total width, 0 decimal places for integer-like display
-    Serial1.print("pv0.txt=\"");
-    Serial1.print(buffer);
-    Serial1.print("\"");
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
-    Serial1.write(0xFF);
+    sendNextionCommand("pv0.txt=\"" + String(buffer) + "\"");
     delay(10);
   }
   // cycle units from kPa to mmHg and back to kPa
@@ -55,23 +39,19 @@ void starting() {
   for (int i = 0; i < 3; i++) {
     flowmeter0.unit = units[i];
 
-    // Hide all unit indicators first
-    Serial1.print("vis un1,0");
-    Serial1.write(0xFF); Serial1.write(0xFF); Serial1.write(0xFF);
-    Serial1.print("vis un2,0");
-    Serial1.write(0xFF); Serial1.write(0xFF); Serial1.write(0xFF);
-    Serial1.print("vis un3,0");
-    Serial1.write(0xFF); Serial1.write(0xFF); Serial1.write(0xFF);
-    
-    // Show the current unit indicator
     if (units[i] == "kPa") {
-      Serial1.print("vis un1,1");
+      sendNextionCommand("vis un1,1");
+      sendNextionCommand("vis un2,0");
+      sendNextionCommand("vis un3,0");
     } else if (units[i] == "mA") {
-      Serial1.print("vis un2,1");
+      sendNextionCommand("vis un1,0");
+      sendNextionCommand("vis un2,1");
+      sendNextionCommand("vis un3,0");
     } else if (units[i] == "mmHg") {
-      Serial1.print("vis un3,1");
+      sendNextionCommand("vis un1,0");
+      sendNextionCommand("vis un2,0");
+      sendNextionCommand("vis un3,1");
     }
-    Serial1.write(0xFF); Serial1.write(0xFF); Serial1.write(0xFF);
     delay(500);
   }
 

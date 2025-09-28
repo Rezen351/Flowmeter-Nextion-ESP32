@@ -1,4 +1,5 @@
 #include "flowmeter.h"
+#include "init.h"
 
 void initial() {
   // //primarybutton{1,0,0,0}
@@ -22,4 +23,11 @@ void initial() {
   // Initialize flowmeter1
   flowmeter1.unit = "kPa";
   flowmeter1.state = 0; 
+}
+
+void sendNextionCommand(String command) {
+  Serial1.print(command);
+  Serial1.write(0xFF);
+  Serial1.write(0xFF);
+  Serial1.write(0xFF);
 }

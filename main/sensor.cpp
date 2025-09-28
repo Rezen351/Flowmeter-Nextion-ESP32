@@ -15,6 +15,8 @@ float readMilliampereSensor0() {
 
   if (result == node.ku8MBSuccess) {
     uint16_t rawValue = node.getResponseBuffer(0);
+    Serial.print("Raw value from Modbus Sensor 0: "); // DEBUG
+    Serial.println(rawValue); // DEBUG
     float milliampere = rawValue / 10.0; // Asumsi nilai dikirim sebagai integer (e.g., 401 untuk 4.01mA)
     lastGoodValue = milliampere;
     return milliampere;
